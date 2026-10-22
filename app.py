@@ -22,29 +22,10 @@ st.set_page_config(
 )
 
 DB_PATH = Path(__file__).with_name("genetics_lab.db")
-SECTIONS = {
-    "chromosomal": {
-        "name": "Хромосомалық теория",
-        "detail": "Тұқымқуалаушылықтың хромосомалық теориясы",
-        "color": "#68C9F5",
-        "emoji": "🩵",
-        "placeholder": "Мысалы: Гендер хромосомаларда орналасады.",
-    },
-    "allelic": {
-        "name": "Аллельді гендер",
-        "detail": "Аллельді гендердің өзара әрекеттесуі",
-        "color": "#FF9BBE",
-        "emoji": "🌷",
-        "placeholder": "Мысалы: Толық доминанттылықта доминантты аллель фенотипте көрінеді.",
-    },
-    "nonallelic": {
-        "name": "Аллельді емес гендер",
-        "detail": "Аллельді емес гендердің өзара әрекеттесуі",
-        "color": "#BF9BFF",
-        "emoji": "💜",
-        "placeholder": "Мысалы: Комплементарлықта екі түрлі ген бір белгінің пайда болуына қатысады.",
-    },
-}
+# Decorative palette only; colors no longer indicate topics or answers.
+FLOWER_COLORS = ["#F7A8C7", "#A8D8FF", "#D3B4FF", "#FFD58C", "#B6EDBA", "#FFAB91", "#F7C0EF"]
+
+
 
 
 @contextmanager
@@ -74,21 +55,22 @@ def init_db():
         )""")
 
 
-def add_discovery(name: str, section: str, fact: str):
-    name, fact = " ".join(name.split()), " ".join(fact.split())
-    if section not in SECTIONS or not (2 <= len(name) <= 40) or not (6 <= len(fact) <= 220):
+def add_feedback(name: str, feedback: str):
+    name = " ".join(name.split())
+    feedback = feedback.strip()
+    if not (2 <= len(name) <= 40) or not (3 <= len(feedback) <= 500):
         raise ValueError("invalid fields")
     with db() as conn:
-        # One flower per name, until the teacher clears the garden.
+        # Reuse the existing table, so old genlab data won't be deleted.
+        # Store a fixed internal key for new feedback (not a category).
         conn.execute("BEGIN IMMEDIATE")
-        # SQLite lower() is ASCII-only: compare Kazakh/Cyrillic names in Python.
         existing = any(row["student_name"].casefold() == name.casefold()
                        for row in conn.execute("SELECT student_name FROM discoveries"))
         if existing:
             raise FileExistsError("duplicate name")
         conn.execute(
             "INSERT INTO discoveries(student_name, section_key, fact_text, created_at) VALUES(?,?,?,?)",
-            (name, section, fact, datetime.now(timezone.utc).isoformat(timespec="seconds")),
+            (name, "feedback", feedback, datetime.now(timezone.utc).isoformat(timespec="seconds")),
         )
 
 
@@ -99,13 +81,7 @@ def all_discoveries(limit: int = 1000):
         ).fetchall()]
 
 
-def counts():
-    result = {k: 0 for k in SECTIONS}
-    with db() as conn:
-        for r in conn.execute("SELECT section_key, count(*) n FROM discoveries GROUP BY section_key"):
-            if r["section_key"] in result:
-                result[r["section_key"]] = r["n"]
-    return result
+# Note: the existing database schema is intentionally maintained for migration.
 
 
 def esc(s):
@@ -130,14 +106,12 @@ def urls():
 def export_csv(rows):
     s = StringIO()
     w = csv.writer(s)
-    w.writerow(["ID", "Оқушы", "Бөлім", "Жауап", "UTC"])
+    w.writerow(["ID", "Аты", "Сабақ туралы пікірі", "Уақыты (UTC)"])
     for r in rows:
         def safe(v):
             v = str(v)
             return "'" + v if v.lstrip().startswith(("=", "+", "-", "@")) else v
-        w.writerow([r["id"], safe(r["student_name"]),
-                    SECTIONS.get(r["section_key"], {}).get("name", r["section_key"]),
-                    safe(r["fact_text"]), r["created_at"]])
+        w.writerow([r["id"], safe(r["student_name"]), safe(r["fact_text"]), r["created_at"]])
     return s.getvalue().encode("utf-8-sig")
 
 
@@ -163,7 +137,7 @@ html, body, .stApp, input, textarea, button {font-family: 'Nunito', sans-serif !
 .garden-hero p {font-size:1rem;color:#d0e9df;line-height:1.7;max-width:920px;margin-bottom:0;}
 .pillbar {display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
 .pill {padding:7px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);font-size:.78rem;color:#e7f4e9;font-weight:800;}
-.statline {display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.statline {display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px;}
 .stat {background:rgba(14,40,37,.76);border:1px solid rgba(177,237,202,.16);border-radius:19px;padding:14px 17px;}
 .stat .n {font-size:1.7rem;color:#fff;font-weight:900;line-height:1.2;}
 .stat .l {font-size:.77rem;color:#b0d6c5;font-weight:800;margin-top:5px;}
@@ -190,12 +164,14 @@ def header(section: str):
     )
 
 
-def legend_html():
-    return ("<div class='section-legend'><h3>🌼 Гүлдердің түстері</h3>"
-            + "".join(
-                f'<div><span style="color:{v["color"]};font-size:1.3rem">●</span> <b>{esc(v["name"])}</b></div>'
-                for v in SECTIONS.values()
-            ) + "</div>")
+def info_html():
+    return ("<div class='section-legend'>"
+            "<h3>🌷 Сенің пікірің маңызды!</h3>"
+            "<p>Сабақ туралы ойыңды еркін жаз: не ұнады, не қызық болды, "
+            "қандай сұрақ қалды?</p>"
+            "<p>Сенің жауабың бақта ерекше гүлге айналады. "
+            "Гүлдердің түстері мен пішіндері әртүрлі — олар жауапты бағаламайды.</p>"
+            "</div>")
 
 
 def garden_document(rows):
@@ -216,8 +192,7 @@ def garden_document(rows):
     for i, r in enumerate(visible):
         x, y, depth = positions[i]
         stable_id = int(r["id"])
-        sec = SECTIONS.get(r["section_key"], SECTIONS["chromosomal"])
-        color = sec["color"]
+        color = FLOWER_COLORS[(stable_id * 11 + stable_id // 5) % len(FLOWER_COLORS)]
         size = (0.72, 0.82, 0.92, 1.02)[depth] * (0.94 + (stable_id % 5) * .025)
         stalk = 58 + (stable_id % 4) * 9
         shape = 5 + stable_id % 3
@@ -225,7 +200,7 @@ def garden_document(rows):
         for p in range(shape):
             ang = p * 360 / shape
             petals.append(f'<ellipse cx="0" cy="-17" rx="11" ry="18" fill="{color}" opacity=".96" transform="rotate({ang:.1f})"/>')
-        flower_nodes.append(f'''<g class="flower" transform="translate({x},{y})" data-name="{esc(r["student_name"])}" data-note="{esc(r["fact_text"])}" data-topic="{esc(sec["name"])}" data-color="{color}" tabindex="0" role="button" aria-label="{esc(r["student_name"])} жауабын ашу">
+        flower_nodes.append(f'''<g class="flower" transform="translate({x},{y})" data-name="{esc(r["student_name"])}" data-note="{esc(r["fact_text"])}" data-color="{color}" tabindex="0" role="button" aria-label="{esc(r["student_name"])} пікірін ашу">
           <g transform="scale({size:.3f})">
             <path d="M0 0 Q{-14 if stable_id%2 else 12} {-stalk//2} 0 {-stalk}" stroke="#72bd85" stroke-width="5" fill="none" stroke-linecap="round"/>
             <ellipse cx="-13" cy="{-stalk//2+8}" rx="19" ry="8" fill="#5ab47b" transform="rotate(-26 -13 {-stalk//2+8})"/>
@@ -244,7 +219,7 @@ def garden_document(rows):
         empty_label = ""
 
     other = max(0, len(rows) - 40)
-    extra_message = f'<div class="limit-message">Тағы {other} гүл тіркелді — барлығы {len(rows)} жауап</div>' if other else ''
+    extra_message = f'<div class="limit-message">Тағы {other} гүл тіркелді — барлығы {len(rows)} пікір</div>' if other else ''
     return f'''<!doctype html><html lang="kk"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
     <style>
     * {{box-sizing:border-box}} html,body{{padding:0;margin:0;background:transparent;font-family:system-ui,sans-serif;color:white}}
@@ -273,7 +248,7 @@ def garden_document(rows):
     .hint{{position:absolute;top:42px;left:20px;color:#e3f4da;font-size:clamp(.67rem,1.3vw,.9rem);z-index:1}}
     </style></head><body>
     <div class="scene">
-    <div class="title">✦ GENETIC GARDEN · LIVE</div><div class="hint">Гүлді басып, оқушының ойын оқы</div>
+    <div class="title">✦ GENETIC GARDEN · LIVE</div><div class="hint">Гүлді басып, студенттің пікірін оқы</div>
     <svg viewBox="0 0 1200 635" xmlns="http://www.w3.org/2000/svg" aria-label="Оқушылардың генетикалық бағы">
       <defs><linearGradient id="hill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a886d"/><stop offset="1" stop-color="#1f4e39"/></linearGradient></defs>
       <circle cx="965" cy="110" r="53" fill="#fcf5c6" opacity=".50"/>
@@ -290,7 +265,7 @@ def garden_document(rows):
       const popup=document.getElementById('modal');
       function reveal(el){{
         document.getElementById('who').textContent='🌸 '+el.dataset.name;
-        document.getElementById('topic').textContent=el.dataset.topic;
+        document.getElementById('topic').textContent='Сабақ туралы пікір';
         document.getElementById('note').textContent=el.dataset.note;
         document.getElementById('modalCard').style.setProperty('--flower-color',el.dataset.color);
         popup.classList.add('active');popup.setAttribute('aria-hidden','false');
@@ -306,15 +281,11 @@ def garden_document(rows):
     </script></body></html>'''
 
 
-def stats_html(data):
-    total = sum(data.values())
-    fields = [("🌱", "Барлық гүлдер", total)] + [
-        (s["emoji"], s["name"], data.get(key, 0)) for key, s in SECTIONS.items()
-    ]
-    return '<div class="statline">' + ''.join(
-        f'<div class="stat"><div class="n">{n}</div><div class="l">{icon} {esc(label)}</div></div>'
-        for icon, label, n in fields
-    ) + '</div>'
+def stats_html(total: int):
+    return (f'<div class="statline"><div class="stat"><div class="n">{total}</div>'
+            '<div class="l">🌸 Бақтағы гүлдер саны</div></div>'
+            '<div class="stat"><div class="n">LIVE</div>'
+            '<div class="l">🌱 Әр пікірден жаңа гүл өседі</div></div></div>')
 
 
 def wall_page(student_url):
@@ -322,62 +293,59 @@ def wall_page(student_url):
     a, b = st.columns([4.5, 1.2], gap="large")
     with a:
         st.markdown('''<div class="garden-hero"><h1>Genetic <span>Garden</span> 🌸</h1>
-        <p>Білім тұқымын бірге егейік! Сабақтан есте қалған бір ғылыми ойыңды бөліс —
-        біздің ортақ бағымызда сенің атыңмен жаңа гүл өседі.</p>
-        <div class="pillbar"><span class="pill">🧬 Хромосомалық теория</span><span class="pill">🌷 Аллельді гендер</span><span class="pill">💜 Аллельді емес гендер</span></div></div>''', unsafe_allow_html=True)
+        <p>Әр пікір — бір гүл! Сабақ туралы ойыңды бөліс, ал біздің ортақ бағымызда
+        сенің атыңмен жаңа гүл пайда болады.</p>
+        <div class="pillbar"><span class="pill">🌱 Атыңды жаз</span>
+        <span class="pill">💬 Пікіріңді қалдыр</span>
+        <span class="pill">🌸 Гүліңді өсір</span></div></div>''', unsafe_allow_html=True)
     with b:
         st.markdown('<div class="qr-card"><h3>📱 Баққа қатысу</h3><p>QR-кодты сканерле</p></div>', unsafe_allow_html=True)
         st.image(qr_bytes(student_url), use_container_width=True)
-        st.link_button("🌱 Гүл өсіру", student_url, use_container_width=True)
+        st.link_button("🌱 Гүл отырғызу", student_url, use_container_width=True)
 
     @st.fragment(run_every="3s")
     def live_garden():
         rows = all_discoveries()
-        st.markdown('<div class="live-mark">🟢 LIVE · Оқушылардың гүлдері автоматты түрде пайда болады</div>', unsafe_allow_html=True)
-        st.markdown(stats_html(counts()), unsafe_allow_html=True)
+        st.markdown('<div class="live-mark">🟢 LIVE · Жаңа гүлдер автоматты түрде пайда болады</div>', unsafe_allow_html=True)
+        st.markdown(stats_html(len(rows)), unsafe_allow_html=True)
         components.html(garden_document(rows), height=700, scrolling=False)
-        with st.expander("📜 Барлық жауаптарды оқу"):
+        with st.expander("💬 Барлық пікірлерді оқу"):
             if not rows:
                 st.info("Бақ әзірге бос. Алғашқы гүлді күтеміз!")
             for r in rows:
-                s = SECTIONS.get(r["section_key"], {"name":r["section_key"],"emoji":"🌼"})
-                st.markdown(f'**{esc(r["student_name"])}** · {s["emoji"]} {esc(s["name"])}')
+                st.markdown(f'**🌼 {esc(r["student_name"])}**')
                 st.write(r["fact_text"])
 
     live_garden()
 
 
 def student_page(wall_url):
-    header("ОҚУШЫ ПАРАҒЫ")
+    header("СТУДЕНТ ПАРАҒЫ")
     st.markdown('''<div class="garden-hero"><h1>Өз гүліңді <span>өсір!</span> 🌷</h1>
-    <p>Бүгінгі сабақта алған бір маңызды біліміңді жаз. Жауабың
-    сыныптың ортақ генетикалық бағында гүлге айналады!</p></div>''', unsafe_allow_html=True)
+    <p>Бүгінгі сабақ туралы пікіріңді жаз. Әр жауап бақта әдемі гүлге айналады!</p></div>''', unsafe_allow_html=True)
     left, right = st.columns([1.8, 1], gap="large")
     with left:
-        st.markdown('<div class="form-blurb">🌱 <b>1.</b> Атыңды енгіз. <b>2.</b> Тақырып таңда. <b>3.</b> Не үйренгеніңді жаз. <b>4.</b> Гүліңді өсір!</div>', unsafe_allow_html=True)
+        st.markdown('<div class="form-blurb">🌱 Атыңды жаз, сабақ туралы ойыңмен бөліс және өз гүліңді отырғыз!</div>', unsafe_allow_html=True)
         with st.form("seed_form", clear_on_submit=True):
-            name = st.text_input("👤 Атың", max_chars=40, placeholder="Мысалы: Айдана")
-            section = st.selectbox("🌸 Қандай білім гүлін өсіресің?", options=list(SECTIONS),
-                                   format_func=lambda k: f'{SECTIONS[k]["emoji"]} {SECTIONS[k]["name"]}')
-            answer = st.text_area("💡 Бүгін не үйрендің?", max_chars=220, height=150,
-                                  placeholder="Бір маңызды ғылыми факт немесе ойыңды жаз...")
-            clicked = st.form_submit_button("🌱 Гүлімді өсіру", use_container_width=True)
+            name = st.text_input("👤 Атың кім?", max_chars=40, placeholder="Мысалы: Айдана")
+            feedback = st.text_area("💬 Сабақ туралы пікірің", max_chars=500, height=165,
+                                    placeholder="Сабақ маған ұнады, себебі... / Мен үшін ең қызығы... / Мен әлі де ... білгім келеді.")
+            clicked = st.form_submit_button("🌱 Гүл отырғызу", use_container_width=True)
         if clicked:
             try:
-                add_discovery(name, section, answer)
+                add_feedback(name, feedback)
             except FileExistsError:
-                st.warning("Бұл атпен гүл бар екен. Егер өз жауабыңды өзгерткің келсе, мұғалімге айт.")
+                st.warning("Бұл атпен гүл бар екен. Пікіріңді өзгерткің келсе, мұғалімге айт.")
             except ValueError:
-                st.warning("Атың 2–40 таңба, жауабың 6–220 таңба болуы керек.")
+                st.warning("Атың 2–40, ал пікірің 3–500 таңба болуы керек.")
             except sqlite3.Error:
-                st.error("Жауап сақталмады. Қайта көріп көр немесе мұғалімге айт.")
+                st.error("Пікір сақталмады. Қайта көріп көр немесе мұғалімге айт.")
             else:
-                st.success(f"🎉 {name.strip()}, сенің гүлің генетикалық бақта пайда болды!")
+                st.success(f"🎉 {name.strip()}, сенің гүлің бақта пайда болды!")
                 st.balloons()
         st.link_button("🌼 Ортақ бақты көру", wall_url, use_container_width=True)
     with right:
-        st.markdown(legend_html(), unsafe_allow_html=True)
-        st.caption("Гүл түсі таңдаған тақырыпты көрсетеді. Гүлдің пішіні — көркемдік безендіру, нақты генетикалық есеп емес.")
+        st.markdown(info_html(), unsafe_allow_html=True)
 
 
 def admin_page(wall_url):
@@ -403,9 +371,9 @@ def admin_page(wall_url):
         return
 
     rows = all_discoveries()
-    st.markdown(stats_html(counts()), unsafe_allow_html=True)
-    st.download_button("⬇️ Жауаптарды CSV ретінде сақтау", data=export_csv(rows),
-                       file_name="genetic_garden_answers.csv", mime="text/csv", disabled=not rows)
+    st.markdown(stats_html(len(rows)), unsafe_allow_html=True)
+    st.download_button("⬇️ Пікірлерді CSV ретінде сақтау", data=export_csv(rows),
+                       file_name="genetic_garden_feedback.csv", mime="text/csv", disabled=not rows)
     st.caption("Маңызды: Streamlit Cloud-та жергілікті SQLite деректері қайта іске қосылғанда жоғалуы мүмкін.")
 
     st.subheader("🌸 Бір гүлді өшіру")
@@ -422,7 +390,7 @@ def admin_page(wall_url):
 
     st.divider()
     st.subheader("🧹 Бақтың деректерін тазалау")
-    if st.checkbox("Барлық жауапты жоюды растаймын"):
+    if st.checkbox("Барлық пікірді жоюды растаймын"):
         if st.button("Бақтағы барлық гүлді өшіру", type="primary"):
             with db() as conn:
                 conn.execute("DELETE FROM discoveries")
