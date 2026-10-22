@@ -14,7 +14,7 @@ import qrcode
 import streamlit as st
 
 st.set_page_config(
-    page_title="Генетикалық зертхана",
+    page_title="CHROM X | Генетикалық зертхана",
     page_icon="🧬",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -277,12 +277,45 @@ html, body, [class*="css"], .stApp, .stApp input, .stApp textarea, .stApp button
 .livebadge::before{content:''; width:8px; height:8px; border-radius:50%; background:#69ecb5; box-shadow:0 0 0 5px rgba(105,236,181,.18);}
 .footerline{text-align:center; font-size:.8rem; letter-spacing:.12em; text-transform:uppercase; color:#89a8c8; margin-top:18px;}
 @media (max-width:1100px){ .stats{grid-template-columns:repeat(2,1fr);} .lab-board{grid-template-columns:1fr;} .module,.center-core{min-height:unset;} .helix-wrap{position:relative; inset:auto; min-height:280px; margin-top:110px; margin-bottom:20px;} }
+
+/* CHROM X identity — keeps the original three-module classroom layout. */
+.site-mark{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:3px 0 18px;padding:10px 16px;
+  border:1px solid rgba(128,230,231,.14);border-radius:16px;background:linear-gradient(90deg,rgba(16,37,61,.82),rgba(13,23,44,.40));}
+.site-wordmark{font-family:'Orbitron','Manrope',sans-serif;letter-spacing:.095em;font-weight:800;font-size:1.25rem;color:#f8fcff;white-space:nowrap}
+.site-wordmark span{color:#71e8ec;text-shadow:0 0 20px rgba(96,232,236,.54)}
+.site-section{font-size:.72rem;color:#9fb9d3;font-weight:800;letter-spacing:.10em;text-transform:uppercase;flex:1}
+.site-indicator{font-family:'Manrope',sans-serif;font-weight:800;font-size:.67rem;letter-spacing:.10em;color:#96ecd1;white-space:nowrap}
+.site-indicator i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#71f1c5;box-shadow:0 0 13px #71f1c5;margin-right:8px}
+.hero-branded{background:radial-gradient(circle at 100% 30%,rgba(82,213,232,.12),transparent 32%),
+   linear-gradient(110deg,#101d35 4%,#142849 64%,#0d2135 100%);border-color:rgba(121,232,226,.25);}
+.hero-branded:before{content:'X';position:absolute;right:12px;top:-94px;font-family:'Orbitron',sans-serif;font-weight:800;
+   font-size:clamp(10rem,22vw,21rem);line-height:1;color:rgba(110,226,237,.047);pointer-events:none;transform:rotate(-10deg)}
+.hero h1.chrom-main{font-family:'Orbitron','Manrope',sans-serif;font-size:clamp(2.9rem,6vw,5.4rem);font-weight:800;
+   letter-spacing:.045em;line-height:1.08;color:#f9fbff;position:relative;z-index:1;margin:7px 0 13px}
+.hero h1.chrom-main em{color:#70e6e8;text-shadow:0 0 26px rgba(91,238,236,.34)}
+.hero-subtitle{color:#e9fbff;font-size:clamp(1.02rem,1.5vw,1.2rem);font-weight:800;margin:0 0 13px;line-height:1.5;position:relative;z-index:1}
+.hero-subtitle span{color:#a9bfd9;font-weight:600}
+.hero-tech{display:flex;flex-wrap:wrap;gap:8px;margin-top:19px;position:relative;z-index:1}
+.hero-tech span{font-size:.63rem;letter-spacing:.085em;color:#91e4de;background:rgba(95,214,220,.08);
+   border:1px solid rgba(97,216,221,.18);padding:7px 10px;border-radius:7px;font-weight:800}
+.core-title.chrom-core{font-family:'Orbitron',sans-serif;font-size:clamp(1.6rem,2.5vw,2.25rem);font-weight:800;
+   letter-spacing:.06em;top:44px;text-shadow:0 0 24px rgba(80,216,240,.20)}
+.core-title.chrom-core span{color:#76f0e3}
+.core-subtitle{position:absolute;top:105px;left:20px;right:20px;font-size:.83rem;line-height:1.45;color:#b5cae3;font-weight:650}
+.helix-wrap{inset:148px 18px 110px}
+@media(max-width:1100px){.helix-wrap{position:relative;inset:auto;margin-top:158px}}
+@media(max-width:650px){.site-indicator{display:none}.site-section{font-size:.62rem}.hero-tech{gap:5px}.hero-tech span{font-size:.57rem}}
 </style>
 """
 
 
 def header(label: str):
-    st.markdown(f'<div class="brandline">✦ GENETICS LAB · {esc(label)}</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="site-mark"><div class="site-wordmark">CHROM <span>X</span></div>'
+        f'<div class="site-section">/ {esc(label)}</div>'
+        '<div class="site-indicator"><i></i> GENETICS LAB · LIVE</div></div>',
+        unsafe_allow_html=True,
+    )
 
 
 def discovery_html(item, is_new=False):
@@ -339,8 +372,9 @@ def render_center_core(total: int, count_map: dict[str, int]):
     return (
         '<section class="center-core">'
         '<div class="core-grid"></div>'
-        '<div class="lab-label">LIVE RESEARCH CORE</div>'
-        '<div class="core-title">Генетикалық <span>зертхана</span><br>Жас генетиктердің ашылымдары</div>'
+        '<div class="lab-label">CHROM X · LIVE RESEARCH</div>'
+        '<div class="core-title chrom-core">CHROM <span>X</span></div>'
+        '<div class="core-subtitle">Генетикалық зертхана<br>Жас генетиктердің ғылыми ашылымдары</div>'
         '<div class="helix-wrap"><div class="helix">'
         + ''.join(nodes) +
         '</div></div>'
@@ -356,11 +390,13 @@ def wall_page(student_url: str):
     left, right = st.columns([4.7, 1.35], gap="large", vertical_alignment="center")
     with left:
         st.markdown(
-            '<div class="hero">'
-            '<div class="brandline" style="margin-bottom:8px;color:#8cf5c8;">🔬 ЖАС ГЕНЕТИКТЕР АЛАҢЫ</div>'
-            '<h1>Генетикалық <em>зертхана</em></h1>'
-            '<p>Студенттер жас генетик рөлінде үш ғылыми бағыттың бірін таңдап, маңызды бір факт жібереді. '
-            'Жаңа ашылымдар сәйкес зертханалық модульде пайда болып, бүкіл сынып бірлесіп виртуалды зертхананы толтырады.</p>'
+            '<div class="hero hero-branded">'
+            '<div class="brandline" style="margin-bottom:8px;color:#8cf5c8;">✦ INTERACTIVE GENETICS LAB · ЖАС ГЕНЕТИКТЕР АЛАҢЫ</div>'
+            '<h1 class="chrom-main">CHROM <em>X</em></h1>'
+            '<div class="hero-subtitle">🧬 Генетикалық зертхана <span>· Жас генетиктердің ғылыми ашылымдары</span></div>'
+            '<p>Үш ғылыми бағыттың бірін таңдап, өзің білетін маңызды фактіні бөліс. '
+            'Сенің ашылымың тиісті зертханалық модульде бірден пайда болады.</p>'
+            '<div class="hero-tech"><span>01 · ХРОМОСОМАЛЫҚ ТЕОРИЯ</span><span>02 · АЛЛЕЛЬДІ ГЕНДЕР</span><span>03 · АЛЛЕЛЬДІ ЕМЕС</span></div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -418,7 +454,7 @@ def wall_page(student_url: str):
                 for row in all_rows[:20]:
                     sec = SECTIONS[row["section_key"]]
                     st.markdown(f'**{esc(row["student_name"])}** · {sec["emoji"]} {esc(sec["title"])}  \\\n{esc(row["fact_text"])}')
-        st.markdown('<div class="footerline">БІР ЗЕРТХАНА · ҮШ БАҒЫТ · ОРТАҚ БІЛІМ</div>', unsafe_allow_html=True)
+        st.markdown('<div class="footerline">CHROM X · БІР ЗЕРТХАНА · ҮШ БАҒЫТ · ОРТАҚ БІЛІМ</div>', unsafe_allow_html=True)
 
     live_lab()
 
@@ -426,9 +462,10 @@ def wall_page(student_url: str):
 def student_page(wall_url: str):
     header("ОҚУШЫ ПАРАҒЫ")
     st.markdown(
-        '<div class="hero">'
-        '<div class="brandline" style="margin-bottom:8px;color:#8cf5c8;">🧫 ЖАС ГЕНЕТИК БОЛЫҢЫЗ</div>'
-        '<h1>Зертханаға <em>өз ашылымыңды</em> қос!</h1>'
+        '<div class="hero hero-branded">'
+        '<div class="brandline" style="margin-bottom:8px;color:#8cf5c8;">🧪 CHROM X · YOUNG RESEARCHER</div>'
+        '<h1 class="chrom-main">CHROM <em>X</em></h1>'
+        '<div class="hero-subtitle">🔬 Зертханаға өз ашылымыңды қос!</div>'
         '<p>Үш ғылыми секцияның бірін таңда, содан кейін сабақтан есте қалған бір маңызды фактіні немесе қысқа ойды жібер.</p>'
         '</div>',
         unsafe_allow_html=True,
@@ -563,3 +600,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
