@@ -99,10 +99,8 @@ def qr_bytes(address: str):
 
 
 def urls():
-    # Students open the form directly at the base address.
-    # The projector wall and administration stay on separate URLs.
     base = st.context.url.split("?", 1)[0].rstrip("/") + "/"
-    return base + "?view=wall", base, base + "?view=admin"
+    return base, base + "?view=student", base + "?view=admin"
 
 
 def export_csv(rows):
@@ -290,63 +288,64 @@ def stats_html(total: int):
             '<div class="l">🌱 Әр пікірден жаңа гүл өседі</div></div></div>')
 
 
-@st.fragment(run_every="3s")
-def live_garden():
-    """Keep the flower wall updated without changing form fields."""
-    rows = all_discoveries()
-    st.markdown('<div class="live-mark">🟢 LIVE · Жаңа гүлдер автоматты түрде пайда болады</div>', unsafe_allow_html=True)
-    st.markdown(stats_html(len(rows)), unsafe_allow_html=True)
-    components.html(garden_document(rows), height=700, scrolling=False)
-    with st.expander("💬 Барлық пікірлерді оқу"):
-        if not rows:
-            st.info("Бақ әзірге бос. Алғашқы гүлді күтеміз!")
-        for r in rows:
-            st.markdown(f'**🌼 {esc(r["student_name"])}**')
-            st.write(r["fact_text"])
-
-
 def wall_page(student_url):
-    """Projector wall is available at ?view=wall."""
     header("ОРТАҚ БАҒЫМЫЗ")
     a, b = st.columns([4.5, 1.2], gap="large")
     with a:
         st.markdown('''<div class="garden-hero"><h1>Genetic <span>Garden</span> 🌸</h1>
         <p>Әр пікір — бір гүл! Сабақ туралы ойыңды бөліс, ал біздің ортақ бағымызда
-        сенің атыңмен жаңа гүл пайда болады.</p></div>''', unsafe_allow_html=True)
+        сенің атыңмен жаңа гүл пайда болады.</p>
+        <div class="pillbar"><span class="pill">🌱 Атыңды жаз</span>
+        <span class="pill">💬 Пікіріңді қалдыр</span>
+        <span class="pill">🌸 Гүліңді өсір</span></div></div>''', unsafe_allow_html=True)
     with b:
         st.markdown('<div class="qr-card"><h3>📱 Баққа қатысу</h3><p>QR-кодты сканерле</p></div>', unsafe_allow_html=True)
         st.image(qr_bytes(student_url), use_container_width=True)
+        st.link_button("🌱 Гүл отырғызу", student_url, use_container_width=True)
+
+    @st.fragment(run_every="3s")
+    def live_garden():
+        rows = all_discoveries()
+        st.markdown('<div class="live-mark">🟢 LIVE · Жаңа гүлдер автоматты түрде пайда болады</div>', unsafe_allow_html=True)
+        st.markdown(stats_html(len(rows)), unsafe_allow_html=True)
+        components.html(garden_document(rows), height=700, scrolling=False)
+        with st.expander("💬 Барлық пікірлерді оқу"):
+            if not rows:
+                st.info("Бақ әзірге бос. Алғашқы гүлді күтеміз!")
+            for r in rows:
+                st.markdown(f'**🌼 {esc(r["student_name"])}**')
+                st.write(r["fact_text"])
+
     live_garden()
 
 
 def student_page(wall_url):
-    """Default home page: name and feedback appear immediately."""
-    header("САБАҚ ТУРАЛЫ ПІКІР")
-    st.markdown('''<div class="garden-hero" style="padding:20px 24px;margin-bottom:10px;">
-    <h1 style="font-size:clamp(1.8rem,4vw,2.9rem);margin-bottom:5px;">Genetic <span>Garden</span> 🌸</h1>
-    <p>Атыңды және сабақ туралы пікіріңді жаз. Пікірің ортақ бақта гүлге айналады!</p>
-    </div>''', unsafe_allow_html=True)
-    with st.form("seed_form", clear_on_submit=True):
-        name = st.text_input("👤 Атың кім?", max_chars=40, placeholder="Мысалы: Айдана")
-        feedback = st.text_area(
-            "💬 Сабақ туралы пікірің", max_chars=500, height=140,
-            placeholder="Сабақ маған ұнады, себебі... / Мен үшін ең қызығы... / Мен әлі де ... білгім келеді.",
-        )
-        clicked = st.form_submit_button("🌱 Пікірді жіберу", use_container_width=True)
-    if clicked:
-        try:
-            add_feedback(name, feedback)
-        except FileExistsError:
-            st.warning("Бұл атпен гүл бар екен. Мұғалімге хабарлас.")
-        except ValueError:
-            st.warning("Атың 2–40, ал пікірің 3–500 таңба болуы керек.")
-        except sqlite3.Error:
-            st.error("Пікір сақталмады. Қайта көріп көр немесе мұғалімге айт.")
-        else:
-            st.success(f"🎉 {name.strip()}, пікірің қабылданды! Гүлің төмендегі бақта пайда болды.")
-            st.balloons()
-    st.markdown("### 🌸 Біздің ортақ бақ")
-    live_garden()
+    header("СТУДЕНТ ПАРАҒЫ")
+    st.markdown('''<div class="garden-hero"><h1>Өз гүліңді <span>өсір!</span> 🌷</h1>
+    <p>Бүгінгі сабақ туралы пікіріңді жаз. Әр жауап бақта әдемі гүлге айналады!</p></div>''', unsafe_allow_html=True)
+    left, right = st.columns([1.8, 1], gap="large")
+    with left:
+        st.markdown('<div class="form-blurb">🌱 Атыңды жаз, сабақ туралы ойыңмен бөліс және өз гүліңді отырғыз!</div>', unsafe_allow_html=True)
+        with st.form("seed_form", clear_on_submit=True):
+            name = st.text_input("👤 Атың кім?", max_chars=40, placeholder="Мысалы: Айдана")
+            feedback = st.text_area("💬 Сабақ туралы пікірің", max_chars=500, height=165,
+                                    placeholder="Сабақ маған ұнады, себебі... / Мен үшін ең қызығы... / Мен әлі де ... білгім келеді.")
+            clicked = st.form_submit_button("🌱 Гүл отырғызу", use_container_width=True)
+        if clicked:
+            try:
+                add_feedback(name, feedback)
+            except FileExistsError:
+                st.warning("Бұл атпен гүл бар екен. Пікіріңді өзгерткің келсе, мұғалімге айт.")
+            except ValueError:
+                st.warning("Атың 2–40, ал пікірің 3–500 таңба болуы керек.")
+            except sqlite3.Error:
+                st.error("Пікір сақталмады. Қайта көріп көр немесе мұғалімге айт.")
+            else:
+                st.success(f"🎉 {name.strip()}, сенің гүлің бақта пайда болды!")
+                st.balloons()
+        st.link_button("🌼 Ортақ бақты көру", wall_url, use_container_width=True)
+    with right:
+        st.markdown(info_html(), unsafe_allow_html=True)
 
 
 def admin_page(wall_url):
@@ -403,13 +402,13 @@ def main():
     init_db()
     st.markdown(APP_CSS, unsafe_allow_html=True)
     wall_url, student_url, _ = urls()
-    view = st.query_params.get("view", "student")
-    if view == "admin":
-        admin_page(wall_url)
-    elif view == "wall":
-        wall_page(student_url)
-    else:
+    view = st.query_params.get("view", "wall")
+    if view == "student":
         student_page(wall_url)
+    elif view == "admin":
+        admin_page(wall_url)
+    else:
+        wall_page(student_url)
 
 
 if __name__ == "__main__":
