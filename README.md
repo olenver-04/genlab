@@ -20,8 +20,3 @@
 pip install -r requirements.txt
 streamlit run app.py
 ```
-
-## Streamlit Cloud Secrets
-```toml
-ADMIN_PASSWORD = "ТвойНадежныйПароль2026"
-```
